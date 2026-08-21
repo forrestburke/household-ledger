@@ -230,6 +230,7 @@
   .anomaly-figs{color:var(--ink-soft); font-size:.82rem;}
   .anomaly-figs strong{color:var(--caution);}
   .tx-account{font-size:.72rem; color:var(--ink-soft); margin-top:2px;}
+  .tx-orig-date{font-size:.7rem; color:var(--ink-soft); margin-top:3px; font-style:italic;}
   .tx-filters{display:flex; gap:8px; flex-wrap:wrap; margin-bottom:14px;}
   .tx-filters input[type=text]{flex:1 1 180px; font-size:.82rem; padding:6px 10px; border-radius:8px; border:1px solid var(--line); background:var(--paper); color:var(--ink);}
   .tx-filters select{flex:0 0 auto; font-size:.82rem; padding:6px 10px; border-radius:8px; border:1px solid var(--line); background:var(--paper); color:var(--ink); max-width:160px;}
@@ -400,6 +401,13 @@ function boot(state){
     });
     Object.keys(state.merchantMap).forEach(k => {
       if(isCleaner(state.merchantMap[k])){ state.merchantMap[k] = 'Cleaners/Hector'; changed = true; }
+    });
+    if(changed) persist();
+  })();
+  (function backfillOrigDate(){
+    let changed = false;
+    state.transactions.forEach(t => {
+      if(!t.origDate){ t.origDate = t.date; changed = true; }
     });
     if(changed) persist();
   })();
@@ -678,7 +686,7 @@ function boot(state){
       const dup = state.transactions.some(t => t.date === date && t.desc === desc.trim() && t.amount === amount);
       if(dup){ skipped++; continue; }
       const sourceCategory = sourceCatIdx >= 0 ? row[sourceCatIdx] : undefined;
-      state.transactions.push({id: uid(), date, desc: desc.trim(), amount, category: autoCategory(desc, sourceCategory), reviewed: false, account: source || undefined});
+      state.transactions.push({id: uid(), date, origDate: date, desc: desc.trim(), amount, category: autoCategory(desc, sourceCategory), reviewed: false, account: source || undefined});
       added++;
     }
     if(minDate && maxDate) state.lastStatementUpload = {from: minDate, to: maxDate};
@@ -1112,7 +1120,9 @@ function boot(state){
         (t.reviewed === false ? '<button class="del-btn" data-review="' + t.id + '" title="Mark reviewed">&check;</button>' : '') +
         '<button class="del-btn" data-del="' + t.id + '" title="Delete">✕</button>';
       return '<tr' + (t.reviewed === false ? ' class="tx-new"' : '') + ' data-tx-row="' + t.id + '">' +
-        '<td><input type="date" class="tx-date" data-tx-date="' + t.id + '" value="' + t.date + '"></td>' +
+        '<td><input type="date" class="tx-date" data-tx-date="' + t.id + '" value="' + t.date + '">' +
+          (t.origDate && t.origDate !== t.date ? '<div class="tx-orig-date">from statement: ' + escapeHtml(fmtDay(t.origDate)) + '</div>' : '') +
+        '</td>' +
         '<td>' + escapeHtml(t.desc) + (t.reviewed === false ? ' <span class="pill new-pill">new</span>' : '') +
           (t.account ? '<div class="tx-account">' + escapeHtml(t.account) + '</div>' : '') +
         '</td>' +
@@ -1302,7 +1312,7 @@ function boot(state){
       const t = state.transactions.find(t => t.id === inp.dataset.txDate);
       if(!t || !inp.value) return;
       t.date = inp.value;
-      render();
+      renderKeepingScroll();
       persist();
     }));
     app.querySelectorAll('[data-tx]').forEach(sel => sel.addEventListener('change', () => {
@@ -1315,21 +1325,15 @@ function boot(state){
         if(sel.value === 'Uncategorized') delete state.merchantMap[key];
         else state.merchantMap[key] = sel.value;
       }
-      const txId = t.id;
-      render();
+      renderKeepingScroll();
       persist();
-      const el = app.querySelector('[data-tx-row="' + CSS.escape(txId) + '"]');
-      if(el) el.scrollIntoView({behavior: 'auto', block: 'nearest'});
     }));
     app.querySelectorAll('[data-review]').forEach(btn => btn.addEventListener('click', () => {
       const t = state.transactions.find(t => t.id === btn.dataset.review);
       if(!t) return;
       t.reviewed = true;
-      const txId = t.id;
-      render();
+      renderKeepingScroll();
       persist();
-      const el = app.querySelector('[data-tx-row="' + CSS.escape(txId) + '"]');
-      if(el) el.scrollIntoView({behavior: 'auto', block: 'nearest'});
     }));
     app.querySelectorAll('[data-del]').forEach(btn => btn.addEventListener('click', () => {
       const t = state.transactions.find(t => t.id === btn.dataset.del);
@@ -1471,7 +1475,7 @@ function boot(state){
       const t = state.transactions.find(t => t.id === btn.dataset.splitUndo);
       if(!t) return;
       delete t.splits;
-      render(); persist();
+      renderKeepingScroll(); persist();
     }));
     app.querySelectorAll('[data-split-cancel]').forEach(btn => btn.addEventListener('click', () => {
       splitEditingId = null;
@@ -1516,13 +1520,10 @@ function boot(state){
       if(splits.length < 2) return;
       t.splits = splits;
       t.reviewed = true;
-      const txId = t.id;
       splitEditingId = null;
       splitDraft = null;
-      render();
+      renderKeepingScroll();
       persist();
-      const el = app.querySelector('[data-tx-row="' + CSS.escape(txId) + '"]');
-      if(el) el.scrollIntoView({behavior: 'auto', block: 'nearest'});
     }));
     app.querySelectorAll('[data-solo-parent]').forEach(el => {
       el.addEventListener('mouseenter', () => {
@@ -1770,6 +1771,16 @@ function boot(state){
       hit.addEventListener('mousemove', positionTooltip);
       hit.addEventListener('mouseleave', () => { tooltipEl.style.display = 'none'; });
     });
+  }
+
+  function renderKeepingScroll(){
+    const wrap = document.querySelector('.table-wrap');
+    const scrollTop = wrap ? wrap.scrollTop : null;
+    render();
+    if(scrollTop !== null){
+      const newWrap = document.querySelector('.table-wrap');
+      if(newWrap) newWrap.scrollTop = scrollTop;
+    }
   }
 
   function escapeHtml(s){
