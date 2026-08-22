@@ -907,6 +907,8 @@ function boot(state){
             const tmTxs = state.transactions.filter(t => monthKey(t.date) === tm);
             return tmTxs.reduce((a,t) => a - labels.reduce((s,l) => s + txAmountForLabel(t,l), 0), 0);
           });
+          const nonZeroMonths = vals.filter(v => v > 0).length;
+          if(nonZeroMonths < 2) return;
           const avg = vals.reduce((a,v) => a + v, 0) / vals.length;
           if(avg > 0 && g.txSpent > avg * 1.3){
             anomalies.push({name: g.name, current: g.txSpent, avg, pct: Math.round((g.txSpent/avg - 1) * 100)});
