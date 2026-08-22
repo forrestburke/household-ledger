@@ -1179,7 +1179,7 @@ function boot(state){
         '<div class="stat"><div class="k">Income to date</div><div class="v num good">' + fmtMoney(income) + '</div></div>' +
         '<div class="stat"><div class="k">Expenses to date</div><div class="v num ' + (spent > budgeted && budgeted>0 ? 'warn':'') + '">' + fmtMoney(spent) + '</div></div>' +
         '<div class="stat"><div class="k">Investments to date</div><div class="v num good">' + fmtMoney(invested) + '</div></div>' +
-        '<div class="stat"><div class="k">Remaining</div><div class="v num ' + (remainingExclInvestments < 0 ? 'warn':'good') + '">' + fmtMoney(remainingExclInvestments) + '</div></div>' +
+        '<div class="stat"><div class="k">Unspent budget</div><div class="v num ' + (remainingExclInvestments < 0 ? 'warn':'good') + '">' + fmtMoney(remainingExclInvestments) + '</div></div>' +
       '</div>' +
 
       (anomalies.length ? (
