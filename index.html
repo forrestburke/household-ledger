@@ -210,15 +210,26 @@
   .msg.ok{background:var(--accent-soft); color:var(--accent-strong);}
   .msg.err{background:var(--warn-soft); color:var(--warn);}
 
-  table.ledger{width:100%; border-collapse:collapse; font-size:.86rem;}
+  table.ledger{width:100%; border-collapse:collapse; font-size:.86rem; table-layout:fixed;}
   table.ledger th{text-align:left; font-size:.7rem; text-transform:uppercase; letter-spacing:.06em; color:var(--ink-soft); font-weight:600; padding:0 10px 8px; border-bottom:1px solid var(--line);}
-  table.ledger td{padding:9px 10px; border-bottom:1px solid var(--line); vertical-align:middle;}
+  table.ledger td{padding:9px 10px; border-bottom:1px solid var(--line); vertical-align:middle; overflow:hidden;}
   table.ledger tr:last-child td{border-bottom:none;}
+  table.ledger th:nth-child(1), table.ledger td:nth-child(1){width:140px;}
+  table.ledger th:nth-child(3), table.ledger td:nth-child(3){width:96px;}
+  table.ledger th:nth-child(4), table.ledger td:nth-child(4){width:160px;}
+  table.ledger th:nth-child(5), table.ledger td:nth-child(5){width:52px;}
   table.ledger td.amt{text-align:right; font-family:'IBM Plex Mono',monospace;}
   table.ledger td.amt.neg{color:var(--warn);}
   table.ledger td.amt.pos{color:var(--accent-strong);}
-  table.ledger select{font-size:.78rem; padding:3px 6px; border-radius:6px; border:1px solid var(--line); background:var(--paper); color:var(--ink); max-width:130px;}
-  table.ledger input.tx-date{font-size:.78rem; padding:3px 4px; border-radius:6px; border:1px solid var(--line); background:var(--paper); color:var(--ink); width:124px;}
+  table.ledger select{font-size:.78rem; padding:3px 6px; border-radius:6px; border:1px solid var(--line); background:var(--paper); color:var(--ink); width:100%; max-width:100%;}
+  table.ledger input.tx-date{font-size:.78rem; padding:3px 4px; border-radius:6px; border:1px solid var(--line); background:var(--paper); color:var(--ink); width:100%; max-width:124px;}
+  .tx-desc{display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:100%;}
+  @media (max-width:520px){
+    table.ledger th:nth-child(1), table.ledger td:nth-child(1){width:104px;}
+    table.ledger th:nth-child(3), table.ledger td:nth-child(3){width:72px;}
+    table.ledger th:nth-child(4), table.ledger td:nth-child(4){width:110px;}
+    table.ledger th:nth-child(5), table.ledger td:nth-child(5){width:36px;}
+  }
   .del-btn{border:none; background:transparent; color:var(--ink-soft); cursor:pointer; font-size:.9rem; margin-right:4px;}
   .del-btn:hover{color:var(--warn);}
   .split-inline-btn{border:none; background:transparent; color:var(--ink-soft); cursor:pointer; font-size:.72rem; text-transform:uppercase; letter-spacing:.03em; padding:0; margin-right:6px; text-decoration:underline; text-decoration-color:transparent; transition:color .15s, text-decoration-color .15s;}
@@ -283,14 +294,14 @@
   .login-card button[type=submit]:active{transform:translateY(1px);}
   .login-card .msg{margin-bottom:4px; text-align:left;}
 
-  .split-editor{display:flex; flex-direction:column; gap:4px; min-width:220px;}
-  .split-line{display:flex; gap:6px; align-items:center;}
-  .split-line .split-amt{width:66px; font-size:.78rem; padding:3px 6px; border-radius:6px; border:1px solid var(--line); background:var(--paper); color:var(--ink);}
-  .split-line .split-cat{flex:1; font-size:.78rem; padding:3px 6px; border-radius:6px; border:1px solid var(--line); background:var(--paper); color:var(--ink); max-width:140px;}
+  .split-editor{display:flex; flex-direction:column; gap:4px; min-width:0;}
+  .split-line{display:flex; gap:6px; align-items:center; flex-wrap:wrap;}
+  .split-line .split-amt{width:60px; flex:0 0 auto; font-size:.78rem; padding:3px 6px; border-radius:6px; border:1px solid var(--line); background:var(--paper); color:var(--ink);}
+  .split-line .split-cat{flex:1 1 80px; min-width:0; font-size:.78rem; padding:3px 6px; border-radius:6px; border:1px solid var(--line); background:var(--paper); color:var(--ink); max-width:100%;}
   .split-remaining{font-size:.72rem; color:var(--ink-soft);}
   .split-remaining.warn{color:var(--warn);}
-  .split-actions{display:flex; gap:6px; margin-top:2px;}
-  .split-badge{display:flex; flex-direction:column; gap:4px; font-size:.8rem; min-width:200px;}
+  .split-actions{display:flex; gap:6px; margin-top:2px; flex-wrap:wrap;}
+  .split-badge{display:flex; flex-direction:column; gap:4px; font-size:.8rem; min-width:0;}
   .split-badge-line{display:flex; align-items:baseline; justify-content:space-between; gap:10px; color:var(--ink-soft);}
   .split-badge-line span:first-child{color:var(--ink); flex:1 1 auto; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;}
   .split-badge-line span:last-child{flex:0 0 auto; white-space:nowrap; font-weight:500; color:var(--ink);}
@@ -1132,7 +1143,7 @@ function boot(state){
         '<td><input type="date" class="tx-date" data-tx-date="' + t.id + '" value="' + t.date + '">' +
           (t.origDate && t.origDate !== t.date ? '<div class="tx-orig-date">from statement: ' + escapeHtml(fmtDay(t.origDate)) + '</div>' : '') +
         '</td>' +
-        '<td>' + escapeHtml(t.desc) + (t.reviewed === false ? ' <span class="pill new-pill">new</span>' : '') +
+        '<td><span class="tx-desc" title="' + escapeHtml(t.desc) + '">' + escapeHtml(t.desc) + (t.reviewed === false ? ' <span class="pill new-pill">new</span>' : '') + '</span>' +
           (t.account ? '<div class="tx-account">' + escapeHtml(t.account) + '</div>' : '') +
         '</td>' +
         '<td class="amt ' + (t.amount < 0 ? 'neg' : 'pos') + '">' + fmtMoney(t.amount) + '<br>' + splitInline + '</td>' +
