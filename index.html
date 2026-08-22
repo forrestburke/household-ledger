@@ -749,7 +749,7 @@ function boot(state){
       theme = btn.dataset.themeSet;
       try{ localStorage.setItem('ledger-theme', theme); } catch(e){}
       applyTheme();
-      render();
+      renderKeepingScroll();
     }));
     const signoutBtn = document.getElementById('signout-btn');
     if(signoutBtn) signoutBtn.addEventListener('click', () => firebase.auth().signOut());
@@ -789,7 +789,7 @@ function boot(state){
       state.merchantMap = backup.merchantMap || {};
       state.lastStatementUpload = backup.lastStatementUpload || null;
       state.txFilters = {search: '', account: 'all', category: 'all', parents: []};
-      render();
+      renderKeepingScroll();
       persist();
       alert('Backup restored.');
     });
@@ -1271,29 +1271,29 @@ function boot(state){
     if(searchEl) searchEl.addEventListener('input', () => {
       state.txFilters.search = searchEl.value;
       const cursor = searchEl.selectionStart;
-      render();
+      renderKeepingScroll();
       const el = document.getElementById('tx-search');
       if(el){ el.focus(); el.setSelectionRange(cursor, cursor); }
     });
     const acctFilterEl = document.getElementById('tx-account-filter');
-    if(acctFilterEl) acctFilterEl.addEventListener('change', () => { state.txFilters.account = acctFilterEl.value; render(); });
+    if(acctFilterEl) acctFilterEl.addEventListener('change', () => { state.txFilters.account = acctFilterEl.value; renderKeepingScroll(); });
     const catFilterEl = document.getElementById('tx-category-filter');
-    if(catFilterEl) catFilterEl.addEventListener('change', () => { state.txFilters.category = catFilterEl.value; render(); });
+    if(catFilterEl) catFilterEl.addEventListener('change', () => { state.txFilters.category = catFilterEl.value; renderKeepingScroll(); });
     const clearFiltersEl = document.getElementById('tx-clear-filters');
     if(clearFiltersEl) clearFiltersEl.addEventListener('click', () => {
       state.txFilters = {search: '', account: 'all', category: 'all', parents: []};
-      render();
+      renderKeepingScroll();
     });
     app.querySelectorAll('[data-solo-parent]').forEach(btn => btn.addEventListener('click', () => {
       const name = btn.dataset.soloParent;
       const idx = state.txFilters.parents.indexOf(name);
       if(idx === -1) state.txFilters.parents.push(name); else state.txFilters.parents.splice(idx, 1);
-      render();
+      renderKeepingScroll();
     }));
     const soloClearEl = document.getElementById('solo-clear');
-    if(soloClearEl) soloClearEl.addEventListener('click', () => { state.txFilters.parents = []; render(); });
+    if(soloClearEl) soloClearEl.addEventListener('click', () => { state.txFilters.parents = []; renderKeepingScroll(); });
     const soloClearTopEl = document.getElementById('solo-clear-top');
-    if(soloClearTopEl) soloClearTopEl.addEventListener('click', () => { state.txFilters.parents = []; render(); });
+    if(soloClearTopEl) soloClearTopEl.addEventListener('click', () => { state.txFilters.parents = []; renderKeepingScroll(); });
     app.querySelectorAll('[data-nav]').forEach(b => b.addEventListener('click', () => {
       const [y,m] = mk.split('-').map(Number);
       const delta = parseInt(b.dataset.nav, 10);
@@ -1303,15 +1303,15 @@ function boot(state){
         const d = new Date(y, m-1+delta, 1);
         state.month = d.toISOString().slice(0,7);
       }
-      render();
+      renderKeepingScroll();
     }));
     app.querySelectorAll('[data-view-mode]').forEach(b => b.addEventListener('click', () => {
       viewMode = b.dataset.viewMode;
-      render();
+      renderKeepingScroll();
     }));
     app.querySelectorAll('[data-page]').forEach(b => b.addEventListener('click', () => {
       page = b.dataset.page;
-      render();
+      renderKeepingScroll();
     }));
     app.querySelectorAll('[data-tx-date]').forEach(inp => inp.addEventListener('change', () => {
       const t = state.transactions.find(t => t.id === inp.dataset.txDate);
@@ -1345,25 +1345,25 @@ function boot(state){
       if(!t) return;
       if(!confirm('Delete this transaction?\n\n' + t.date + ' — ' + t.desc + ' — ' + fmtMoney(t.amount) + '\n\nThis cannot be undone.')) return;
       state.transactions = state.transactions.filter(tx => tx.id !== btn.dataset.del);
-      render(); persist();
+      renderKeepingScroll(); persist();
     }));
     app.querySelectorAll('[data-expand-cats]').forEach(btn => btn.addEventListener('click', () => {
       catsExpanded = !catsExpanded;
-      render();
+      renderKeepingScroll();
     }));
     app.querySelectorAll('[data-expand-subs]').forEach(btn => btn.addEventListener('click', () => {
       subsExpanded = !subsExpanded;
-      render();
+      renderKeepingScroll();
     }));
     const sortSel = document.getElementById('cat-sort-select');
-    if(sortSel) sortSel.addEventListener('change', () => { catSort = sortSel.value; render(); });
+    if(sortSel) sortSel.addEventListener('change', () => { catSort = sortSel.value; renderKeepingScroll(); });
     wireImportExport();
     const headerMenuToggle = document.getElementById('header-menu-toggle');
-    if(headerMenuToggle) headerMenuToggle.addEventListener('click', (e) => { e.stopPropagation(); headerMenuOpen = !headerMenuOpen; render(); });
+    if(headerMenuToggle) headerMenuToggle.addEventListener('click', (e) => { e.stopPropagation(); headerMenuOpen = !headerMenuOpen; renderKeepingScroll(); });
     const addCatToggle = document.getElementById('add-cat-toggle');
-    if(addCatToggle) addCatToggle.addEventListener('click', () => { addCatOpen = true; render(); });
+    if(addCatToggle) addCatToggle.addEventListener('click', () => { addCatOpen = true; renderKeepingScroll(); });
     const addCatCancel = document.getElementById('add-cat-cancel');
-    if(addCatCancel) addCatCancel.addEventListener('click', () => { addCatOpen = false; render(); });
+    if(addCatCancel) addCatCancel.addEventListener('click', () => { addCatOpen = false; renderKeepingScroll(); });
     const addCatParentSelect = document.getElementById('add-cat-parent-select');
     if(addCatParentSelect) addCatParentSelect.addEventListener('change', () => {
       const newInput = document.getElementById('add-cat-parent-new');
@@ -1390,16 +1390,16 @@ function boot(state){
       const type = document.getElementById('add-cat-type').value;
       state.categories.push({id: uid(), name, parent, monthly, type});
       addCatOpen = false;
-      render();
+      renderKeepingScroll();
       persist();
     });
     app.querySelectorAll('[data-cat-edit]').forEach(btn => btn.addEventListener('click', () => {
       editingCatId = btn.dataset.catEdit;
-      render();
+      renderKeepingScroll();
     }));
     app.querySelectorAll('[data-cat-edit-cancel]').forEach(btn => btn.addEventListener('click', () => {
       editingCatId = null;
-      render();
+      renderKeepingScroll();
     }));
     app.querySelectorAll('.cat-edit-parent-select').forEach(sel => sel.addEventListener('change', () => {
       const newInput = sel.parentElement.querySelector('.cat-edit-parent-new');
@@ -1438,7 +1438,7 @@ function boot(state){
         Object.keys(state.merchantMap).forEach(k => { if(state.merchantMap[k] === oldLabel) state.merchantMap[k] = newLabel; });
       }
       editingCatId = null;
-      render();
+      renderKeepingScroll();
       persist();
     }));
     app.querySelectorAll('[data-cat-delete]').forEach(btn => btn.addEventListener('click', () => {
@@ -1456,7 +1456,7 @@ function boot(state){
       });
       Object.keys(state.merchantMap).forEach(k => { if(state.merchantMap[k] === label) delete state.merchantMap[k]; });
       editingCatId = null;
-      render();
+      renderKeepingScroll();
       persist();
     }));
     app.querySelectorAll('[data-split-start]').forEach(btn => btn.addEventListener('click', () => {
@@ -1467,14 +1467,14 @@ function boot(state){
         {amount: Math.abs(t.amount).toFixed(2), category: t.category && t.category !== 'Uncategorized' ? t.category : 'Uncategorized'},
         {amount: '', category: 'Uncategorized'}
       ];
-      render();
+      renderKeepingScroll();
     }));
     app.querySelectorAll('[data-split-edit]').forEach(btn => btn.addEventListener('click', () => {
       const t = state.transactions.find(t => t.id === btn.dataset.splitEdit);
       if(!t || !t.splits) return;
       splitEditingId = t.id;
       splitDraft = t.splits.map(s => ({amount: Math.abs(s.amount).toFixed(2), category: s.category}));
-      render();
+      renderKeepingScroll();
     }));
     app.querySelectorAll('[data-split-undo]').forEach(btn => btn.addEventListener('click', () => {
       const t = state.transactions.find(t => t.id === btn.dataset.splitUndo);
@@ -1485,16 +1485,16 @@ function boot(state){
     app.querySelectorAll('[data-split-cancel]').forEach(btn => btn.addEventListener('click', () => {
       splitEditingId = null;
       splitDraft = null;
-      render();
+      renderKeepingScroll();
     }));
     app.querySelectorAll('[data-split-add]').forEach(btn => btn.addEventListener('click', () => {
       if(splitDraft && splitDraft.length < 5) splitDraft.push({amount: '', category: 'Uncategorized'});
-      render();
+      renderKeepingScroll();
     }));
     app.querySelectorAll('[data-split-remove]').forEach(btn => btn.addEventListener('click', () => {
       const idx = parseInt(btn.dataset.splitRemove, 10);
       if(splitDraft) splitDraft.splice(idx, 1);
-      render();
+      renderKeepingScroll();
     }));
     app.querySelectorAll('.split-amt').forEach(inp => inp.addEventListener('input', () => {
       if(!splitDraft) return;
@@ -1729,30 +1729,30 @@ function boot(state){
 
     wireImportExport();
     const headerMenuToggle = document.getElementById('header-menu-toggle');
-    if(headerMenuToggle) headerMenuToggle.addEventListener('click', (e) => { e.stopPropagation(); headerMenuOpen = !headerMenuOpen; render(); });
-    app.querySelectorAll('[data-page]').forEach(b => b.addEventListener('click', () => { page = b.dataset.page; render(); }));
-    app.querySelectorAll('[data-trend-gran]').forEach(b => b.addEventListener('click', () => { trendsGranularity = b.dataset.trendGran; render(); }));
+    if(headerMenuToggle) headerMenuToggle.addEventListener('click', (e) => { e.stopPropagation(); headerMenuOpen = !headerMenuOpen; renderKeepingScroll(); });
+    app.querySelectorAll('[data-page]').forEach(b => b.addEventListener('click', () => { page = b.dataset.page; renderKeepingScroll(); }));
+    app.querySelectorAll('[data-trend-gran]').forEach(b => b.addEventListener('click', () => { trendsGranularity = b.dataset.trendGran; renderKeepingScroll(); }));
     app.querySelectorAll('.trend-row-group').forEach(sel => sel.addEventListener('change', () => {
       const idx = parseInt(sel.dataset.rowIdx, 10);
       trendsRows[idx] = {group: sel.value, sub: 'all'};
-      render();
+      renderKeepingScroll();
     }));
     app.querySelectorAll('.trend-row-sub').forEach(sel => sel.addEventListener('change', () => {
       const idx = parseInt(sel.dataset.rowIdx, 10);
       trendsRows[idx].sub = sel.value;
-      render();
+      renderKeepingScroll();
     }));
     app.querySelectorAll('[data-row-remove]').forEach(btn => btn.addEventListener('click', () => {
       const idx = parseInt(btn.dataset.rowRemove, 10);
       trendsRows.splice(idx, 1);
-      render();
+      renderKeepingScroll();
     }));
     const addBtn = document.getElementById('trend-add-row');
     if(addBtn) addBtn.addEventListener('click', () => {
       const usedGroups = trendsRows.map(r => r.group);
       const nextGroup = groups.find(g => !usedGroups.includes(g.name)) || groups[0];
       trendsRows.push({group: nextGroup.name, sub: 'all'});
-      render();
+      renderKeepingScroll();
     });
     const tooltipEl = document.getElementById('trend-tooltip');
     const wrapEl = app.querySelector('.trend-chart-wrap');
@@ -1815,7 +1815,7 @@ function boot(state){
     } catch(err){
       msg.budget = {ok:'err', text: 'Could not read that file.'};
     }
-    render(); persist();
+    renderKeepingScroll(); persist();
   }
 
   async function onStatementFile(e){
@@ -1829,7 +1829,7 @@ function boot(state){
     } catch(err){
       msg.statement = {ok:'err', text: 'Could not read that file.'};
     }
-    render(); persist();
+    renderKeepingScroll(); persist();
   }
 
   render();
@@ -1839,7 +1839,7 @@ function boot(state){
     const menu = document.querySelector('.header-menu');
     if(menu && !menu.contains(e.target)){
       headerMenuOpen = false;
-      render();
+      renderKeepingScroll();
     }
   });
 
@@ -1854,7 +1854,7 @@ function boot(state){
     state.lastStatementUpload = state.lastStatementUpload || null;
     state.txFilters = state.txFilters || {search: '', account: 'all', category: 'all'};
     state.txFilters.parents = state.txFilters.parents || [];
-    render();
+    renderKeepingScroll();
     setSyncMode('synced');
   }, () => setSyncMode('local'));
 }
