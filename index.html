@@ -157,6 +157,7 @@
   .cat-scroll::-webkit-scrollbar-thumb{background:var(--line); border-radius:4px;}
   .cat-row.cat-child, .income-row.cat-child{padding:6px 0 6px 20px; font-size:.88em;}
   .cat-row.cat-child{grid-template-columns:1fr auto auto; align-items:center;}
+  .cat-row.cat-row-self{grid-template-columns:1fr auto auto; align-items:center;}
   .cat-row.cat-child .cat-ctl{opacity:0; transition:opacity .15s;}
   .cat-row.cat-child:hover .cat-ctl{opacity:.55;}
   .cat-row.cat-child .cat-ctl:hover{opacity:1;}
@@ -1006,14 +1007,17 @@ function boot(state){
           catControlsHtml(k) +
         '</div>';
       }).join('');
-      return '<div class="cat-group" data-group="' + escapeHtml(g.name) + '">' +
-        '<div class="cat-row">' +
+      const selfRow = (g.self && editingCatId === g.self.id) ? catEditFormHtml(g.self) :
+        '<div class="cat-row' + (g.self ? ' cat-row-self' : '') + '">' +
           '<div class="name">' + escapeHtml(g.name) + '</div>' +
           '<div class="figures"><span class="spent num ' + status + '">' + fmtMoney(catSpent) + '</span> / <span class="num">' + fmtMoney(monthly) + '</span> ' +
           '<span class="pill ' + status + '">' + statusLabel + '</span></div>' +
           '<div class="bar-track"><div class="bar-fill ' + status + '" style="width:' + pct + '%"></div></div>' +
           '<div class="figures" style="grid-column:1/-1; font-size:.74rem;">' + (remain >= 0 ? fmtMoney(remain) + ' left ' + periodWord : fmtMoney(Math.abs(remain)) + ' over ' + periodWord) + (momHtml ? ' &middot; ' + momHtml : '') + '</div>' +
-        '</div>' +
+          (g.self ? catControlsHtml(g.self) : '') +
+        '</div>';
+      return '<div class="cat-group" data-group="' + escapeHtml(g.name) + '">' +
+        selfRow +
         childRows +
       '</div>';
     }).join('') : '<div class="empty">Upload your budget structure to see categories here.</div>';
@@ -1426,6 +1430,7 @@ function boot(state){
       }
       const monthly = parseFloat(form.querySelector('.cat-edit-monthly').value) || 0;
       const oldLabel = catLabel(c, state.categories);
+      const oldName = c.name;
       c.name = name;
       c.parent = parent;
       c.monthly = monthly;
@@ -1436,6 +1441,11 @@ function boot(state){
           if(t.splits) t.splits.forEach(s => { if(s.category === oldLabel) s.category = newLabel; });
         });
         Object.keys(state.merchantMap).forEach(k => { if(state.merchantMap[k] === oldLabel) state.merchantMap[k] = newLabel; });
+      }
+      if(oldName.toLowerCase() !== name.toLowerCase()){
+        state.categories.forEach(cat => {
+          if(cat.id !== id && (cat.parent || '').trim().toLowerCase() === oldName.trim().toLowerCase()) cat.parent = name;
+        });
       }
       editingCatId = null;
       renderKeepingScroll();
