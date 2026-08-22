@@ -929,6 +929,8 @@ function boot(state){
     ];
     const investmentCats = state.categories.filter(c => investmentCatMatchers.some(m => m.name === c.name && c.parent === m.parent));
     const invested = investmentCats.reduce((a,c) => a + categoryActualSpent(c), 0);
+    const investmentBudgeted = investmentCats.reduce((a,c) => a + c.monthly, 0) * periodMultiplier;
+    const remainingExclInvestments = (budgeted - investmentBudgeted) - (spent - invested);
 
     const allGroupNamesSorted = expenseGroupsRaw.map(g => g.name).slice().sort((a,b) => a.localeCompare(b));
     const colorForGroup = name => sliceColor(allGroupNamesSorted.indexOf(name), allGroupNamesSorted.length);
@@ -1177,7 +1179,7 @@ function boot(state){
         '<div class="stat"><div class="k">Income to date</div><div class="v num good">' + fmtMoney(income) + '</div></div>' +
         '<div class="stat"><div class="k">Expenses to date</div><div class="v num ' + (spent > budgeted && budgeted>0 ? 'warn':'') + '">' + fmtMoney(spent) + '</div></div>' +
         '<div class="stat"><div class="k">Investments to date</div><div class="v num good">' + fmtMoney(invested) + '</div></div>' +
-        '<div class="stat"><div class="k">Remaining</div><div class="v num ' + (remaining < 0 ? 'warn':'good') + '">' + fmtMoney(remaining) + '</div></div>' +
+        '<div class="stat"><div class="k">Remaining</div><div class="v num ' + (remainingExclInvestments < 0 ? 'warn':'good') + '">' + fmtMoney(remainingExclInvestments) + '</div></div>' +
       '</div>' +
 
       (anomalies.length ? (
