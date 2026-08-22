@@ -394,6 +394,27 @@ function boot(state){
   state.lastStatementUpload = state.lastStatementUpload || null;
   state.txFilters = state.txFilters || {search: '', account: 'all', category: 'all'};
   state.txFilters.parents = state.txFilters.parents || [];
+  let syncMode = 'checking';
+  let lastWritten = null;
+  function setSyncMode(mode){
+    syncMode = mode;
+    const dot = document.getElementById('sync-badge');
+    if(dot){
+      dot.className = mode === 'local' ? 'sync local' : 'sync';
+      dot.lastElementChild.textContent = mode === 'local' ? 'local only' : 'synced';
+    }
+  }
+  async function persist(){
+    try{
+      const json = JSON.stringify(state);
+      lastWritten = json;
+      await stateRef.set(JSON.parse(json));
+      setSyncMode('synced');
+    } catch(e){
+      console.warn('sync failed', e);
+      setSyncMode('local');
+    }
+  }
   (function migrateCleanerRename(){
     let changed = false;
     const isCleaner = name => typeof name === 'string' && name.trim().toLowerCase() === 'cleaner';
@@ -427,7 +448,6 @@ function boot(state){
     if(!r) return '';
     return r.from === r.to ? fmtDay(r.from) : fmtDay(r.from) + ' – ' + fmtDay(r.to);
   }
-  let syncMode = 'checking';
   let catsExpanded = false;
   let catSort = 'alpha';
   let subsExpanded = false;
@@ -456,29 +476,6 @@ function boot(state){
       .map(mk2 => parseInt(mk2.slice(5,7), 10));
     if(!monthsWithData.length) return 0;
     return Math.max.apply(null, monthsWithData);
-  }
-
-  function setSyncMode(mode){
-    syncMode = mode;
-    const dot = document.getElementById('sync-badge');
-    if(dot){
-      dot.className = mode === 'local' ? 'sync local' : 'sync';
-      dot.lastElementChild.textContent = mode === 'local' ? 'local only' : 'synced';
-    }
-  }
-
-  let lastWritten = null;
-
-  async function persist(){
-    try{
-      const json = JSON.stringify(state);
-      lastWritten = json;
-      await stateRef.set(JSON.parse(json));
-      setSyncMode('synced');
-    } catch(e){
-      console.warn('sync failed', e);
-      setSyncMode('local');
-    }
   }
 
   function catLabel(c, allCats){
@@ -1784,11 +1781,14 @@ function boot(state){
   function renderKeepingScroll(){
     const wrap = document.querySelector('.table-wrap');
     const scrollTop = wrap ? wrap.scrollTop : null;
+    const windowScrollY = window.scrollY;
+    const windowScrollX = window.scrollX;
     render();
     if(scrollTop !== null){
       const newWrap = document.querySelector('.table-wrap');
       if(newWrap) newWrap.scrollTop = scrollTop;
     }
+    window.scrollTo(windowScrollX, windowScrollY);
   }
 
   function escapeHtml(s){
