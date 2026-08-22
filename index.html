@@ -1799,16 +1799,20 @@ function boot(state){
     });
   }
 
+  const SCROLLABLE_SELECTORS = ['.table-wrap', '.cat-scroll', '.legend-subs'];
   function renderKeepingScroll(){
-    const wrap = document.querySelector('.table-wrap');
-    const scrollTop = wrap ? wrap.scrollTop : null;
+    const scrollTops = SCROLLABLE_SELECTORS.map(sel => {
+      const el = document.querySelector(sel);
+      return el ? el.scrollTop : null;
+    });
     const windowScrollY = window.scrollY;
     const windowScrollX = window.scrollX;
     render();
-    if(scrollTop !== null){
-      const newWrap = document.querySelector('.table-wrap');
-      if(newWrap) newWrap.scrollTop = scrollTop;
-    }
+    SCROLLABLE_SELECTORS.forEach((sel, i) => {
+      if(scrollTops[i] === null) return;
+      const el = document.querySelector(sel);
+      if(el) el.scrollTop = scrollTops[i];
+    });
     window.scrollTo(windowScrollX, windowScrollY);
   }
 
