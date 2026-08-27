@@ -223,7 +223,9 @@
   table.ledger td.amt.pos{color:var(--accent-strong);}
   table.ledger select{font-size:.78rem; padding:3px 6px; border-radius:6px; border:1px solid var(--line); background:var(--paper); color:var(--ink); width:100%; max-width:100%;}
   table.ledger input.tx-date{font-size:.78rem; padding:3px 4px; border-radius:6px; border:1px solid var(--line); background:var(--paper); color:var(--ink); width:100%; max-width:124px;}
-  .tx-desc{display:block; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; max-width:100%;}
+  .tx-desc-line{display:flex; align-items:baseline; gap:6px; min-width:0;}
+  .tx-desc{overflow:hidden; text-overflow:ellipsis; white-space:nowrap; min-width:0; flex:1 1 auto;}
+  .tx-desc-line .pill{flex:0 0 auto;}
   @media (max-width:520px){
     table.ledger th:nth-child(1), table.ledger td:nth-child(1){width:104px;}
     table.ledger th:nth-child(3), table.ledger td:nth-child(3){width:72px;}
@@ -1147,7 +1149,7 @@ function boot(state){
         '<td><input type="date" class="tx-date" data-tx-date="' + t.id + '" value="' + t.date + '">' +
           (t.origDate && t.origDate !== t.date ? '<div class="tx-orig-date">from statement: ' + escapeHtml(fmtDay(t.origDate)) + '</div>' : '') +
         '</td>' +
-        '<td><span class="tx-desc" title="' + escapeHtml(t.desc) + '">' + escapeHtml(t.desc) + (t.reviewed === false ? ' <span class="pill new-pill">new</span>' : '') + '</span>' +
+        '<td><div class="tx-desc-line"><span class="tx-desc" title="' + escapeHtml(t.desc) + '">' + escapeHtml(t.desc) + '</span>' + (t.reviewed === false ? '<span class="pill new-pill">new</span>' : '') + '</div>' +
           (t.account ? '<div class="tx-account">' + escapeHtml(t.account) + '</div>' : '') +
         '</td>' +
         '<td class="amt ' + (t.amount < 0 ? 'neg' : 'pos') + '">' + fmtMoney(t.amount) + '<br>' + splitInline + '</td>' +
