@@ -208,6 +208,13 @@
   input[type=file]{font-size:.8rem; width:100%; color:var(--ink-soft);}
   .msg{font-size:.78rem; margin-top:8px; padding:6px 10px; border-radius:8px;}
   .msg.ok{background:var(--accent-soft); color:var(--accent-strong);}
+  .deleted-scroll{max-height:220px; overflow-y:auto; padding-right:4px; margin-right:-4px;}
+  .deleted-scroll::-webkit-scrollbar{width:8px;} .deleted-scroll::-webkit-scrollbar-thumb{background:var(--line); border-radius:4px;}
+  .deleted-row{display:flex; align-items:center; justify-content:space-between; gap:10px; padding:8px 0; border-bottom:1px solid var(--line); font-size:.84rem;}
+  .deleted-row:last-child{border-bottom:none;}
+  .deleted-info{display:flex; flex-direction:column; gap:2px; min-width:0; flex:1 1 auto;}
+  .deleted-desc{overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-weight:500;}
+  .deleted-figs{font-size:.76rem; color:var(--ink-soft);}
   .msg.err{background:var(--warn-soft); color:var(--warn);}
 
   table.ledger{width:100%; border-collapse:collapse; font-size:.86rem; table-layout:fixed;}
@@ -408,6 +415,7 @@ function boot(state){
   state.lastStatementUpload = state.lastStatementUpload || null;
   state.txFilters = state.txFilters || {search: '', account: 'all', category: 'all'};
   state.txFilters.parents = state.txFilters.parents || [];
+  state.deletedTransactions = state.deletedTransactions || [];
   let syncMode = 'checking';
   let lastWritten = null;
   function setSyncMode(mode){
@@ -1158,6 +1166,16 @@ function boot(state){
         '</tr>';
     }).join('');
 
+    const deletedRows = state.deletedTransactions.map(t => (
+      '<div class="deleted-row">' +
+        '<div class="deleted-info">' +
+          '<span class="deleted-desc">' + escapeHtml(t.desc) + '</span>' +
+          '<span class="deleted-figs">' + escapeHtml(fmtDay(t.date)) + ' &middot; ' + fmtMoney(t.amount) + ' &middot; ' + escapeHtml(t.category) + '</span>' +
+        '</div>' +
+        '<button type="button" class="expand-btn" data-restore-tx="' + escapeHtml(t.id) + '">Restore</button>' +
+      '</div>'
+    )).join('');
+
     app.innerHTML =
       '<header class="top">' +
         '<div class="brand"><h1>Burke Household Ledger</h1><span class="tag">Home Budget</span></div>' +
@@ -1283,6 +1301,13 @@ function boot(state){
               (msg.statement ? '<div class="msg ' + msg.statement.ok + '">' + msg.statement.text + '</div>' : '') +
             '</div>' +
           '</div>' +
+          (state.deletedTransactions.length ? (
+            '<div class="card">' +
+              '<h2>Recently deleted</h2>' +
+              '<div class="sub">' + state.deletedTransactions.length + ' transaction' + (state.deletedTransactions.length === 1 ? '' : 's') + ' &mdash; restore any you deleted by mistake</div>' +
+              '<div class="deleted-scroll">' + deletedRows + '</div>' +
+            '</div>'
+          ) : '') +
         '</div>' +
       '</div>' +
       '<footer>Updates save automatically and sync across every open view.</footer>';
@@ -1364,8 +1389,20 @@ function boot(state){
     app.querySelectorAll('[data-del]').forEach(btn => btn.addEventListener('click', () => {
       const t = state.transactions.find(t => t.id === btn.dataset.del);
       if(!t) return;
-      if(!confirm('Delete this transaction?\n\n' + t.date + ' — ' + t.desc + ' — ' + fmtMoney(t.amount) + '\n\nThis cannot be undone.')) return;
+      if(!confirm('Delete this transaction?\n\n' + t.date + ' — ' + t.desc + ' — ' + fmtMoney(t.amount) + '\n\nYou can restore it from Recently deleted afterward.')) return;
       state.transactions = state.transactions.filter(tx => tx.id !== btn.dataset.del);
+      state.deletedTransactions.unshift(Object.assign({}, t, {deletedAt: new Date().toISOString()}));
+      state.deletedTransactions = state.deletedTransactions.slice(0, 50);
+      renderKeepingScroll(); persist();
+    }));
+    app.querySelectorAll('[data-restore-tx]').forEach(btn => btn.addEventListener('click', () => {
+      const id = btn.dataset.restoreTx;
+      const idx = state.deletedTransactions.findIndex(t => t.id === id);
+      if(idx === -1) return;
+      const t = Object.assign({}, state.deletedTransactions[idx]);
+      delete t.deletedAt;
+      state.deletedTransactions.splice(idx, 1);
+      state.transactions.push(t);
       renderKeepingScroll(); persist();
     }));
     app.querySelectorAll('[data-expand-cats]').forEach(btn => btn.addEventListener('click', () => {
@@ -1805,7 +1842,7 @@ function boot(state){
     });
   }
 
-  const SCROLLABLE_SELECTORS = ['.table-wrap', '.cat-scroll', '.legend-subs'];
+  const SCROLLABLE_SELECTORS = ['.table-wrap', '.cat-scroll', '.legend-subs', '.deleted-scroll'];
   function renderKeepingScroll(){
     const scrollTops = SCROLLABLE_SELECTORS.map(sel => {
       const el = document.querySelector(sel);
@@ -1885,6 +1922,7 @@ function boot(state){
     state.lastStatementUpload = state.lastStatementUpload || null;
     state.txFilters = state.txFilters || {search: '', account: 'all', category: 'all'};
     state.txFilters.parents = state.txFilters.parents || [];
+    state.deletedTransactions = state.deletedTransactions || [];
     renderKeepingScroll();
     setSyncMode('synced');
   }, () => setSyncMode('local'));
