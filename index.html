@@ -459,6 +459,16 @@ function boot(state){
     });
     if(changed) persist();
   })();
+  (function backfillMonthlyHistory(){
+    let changed = false;
+    state.categories.forEach(c => {
+      if(!c.monthlyHistory || !c.monthlyHistory.length){
+        c.monthlyHistory = [{from: '0000-01', amount: c.monthly || 0}];
+        changed = true;
+      }
+    });
+    if(changed) persist();
+  })();
   window.__debugState = state;
   let msg = { budget: null, statement: null };
 
@@ -504,6 +514,25 @@ function boot(state){
     const dupes = allCats.filter(o => o.name.toLowerCase() === c.name.toLowerCase());
     if(dupes.length <= 1 && !c.forceLabel) return c.name;
     return (c.parent && c.parent.trim() ? c.parent.trim() + ' — ' : '') + c.name;
+  }
+
+  function monthlyBudgetFor(c, mk){
+    const hist = c.monthlyHistory;
+    if(!hist || !hist.length) return c.monthly || 0;
+    let amount = hist[0].amount;
+    for(const entry of hist){
+      if(entry.from <= mk) amount = entry.amount; else break;
+    }
+    return amount;
+  }
+
+  function upsertMonthlyHistory(c, mk, amount){
+    c.monthlyHistory = c.monthlyHistory || [];
+    const idx = c.monthlyHistory.findIndex(e => e.from === mk);
+    if(idx >= 0) c.monthlyHistory[idx].amount = amount;
+    else c.monthlyHistory.push({from: mk, amount});
+    c.monthlyHistory.sort((a,b) => a.from.localeCompare(b.from));
+    c.monthly = c.monthlyHistory[c.monthlyHistory.length - 1].amount;
   }
 
   function sliceColor(i, n){
@@ -622,12 +651,12 @@ function boot(state){
         (parentIdx < 0 || (c.parent || '').toLowerCase() === (parent || '').toLowerCase())
       );
       if(existing){
-        existing.monthly = val;
+        upsertMonthlyHistory(existing, currentMonth(), val);
         if(type) existing.type = type;
         if(parentIdx >= 0) existing.parent = parent;
         updated++;
       } else {
-        state.categories.push({id: uid(), name: name.trim(), monthly: val, type: type || 'expense', parent: parent || undefined});
+        state.categories.push({id: uid(), name: name.trim(), monthly: val, type: type || 'expense', parent: parent || undefined, monthlyHistory: [{from: currentMonth(), amount: val}]});
         added++;
       }
     }
@@ -721,7 +750,7 @@ function boot(state){
     const txs = state.transactions.filter(t => monthKey(t.date) === mk);
     const spent = txs.filter(t => t.amount < 0).reduce((a,t) => a - t.amount, 0);
     const income = txs.filter(t => t.amount > 0).reduce((a,t) => a + t.amount, 0);
-    const budgeted = state.categories.filter(c => (c.type||'expense') !== 'income').reduce((a,c) => a + c.monthly, 0);
+    const budgeted = state.categories.filter(c => (c.type||'expense') !== 'income').reduce((a,c) => a + monthlyBudgetFor(c, mk), 0);
     return {spent, income, budgeted, remaining: budgeted - spent, txs, elapsed: 1};
   }
 
@@ -730,7 +759,11 @@ function boot(state){
     const spent = txs.filter(t => t.amount < 0).reduce((a,t) => a - t.amount, 0);
     const income = txs.filter(t => t.amount > 0).reduce((a,t) => a + t.amount, 0);
     const elapsed = monthsElapsedInYear(year);
-    const budgeted = state.categories.filter(c => (c.type||'expense') !== 'income').reduce((a,c) => a + c.monthly, 0) * elapsed;
+    let budgeted = 0;
+    for(let m = 1; m <= elapsed; m++){
+      const mk2 = year + '-' + String(m).padStart(2,'0');
+      budgeted += state.categories.filter(c => (c.type||'expense') !== 'income').reduce((a,c) => a + monthlyBudgetFor(c, mk2), 0);
+    }
     return {spent, income, budgeted, remaining: budgeted - spent, txs, elapsed};
   }
 
@@ -826,6 +859,16 @@ function boot(state){
     const periodYear = mk.slice(0,4);
     const {spent, income, budgeted, remaining, txs, elapsed} = viewMode === 'year' ? totalsForYear(periodYear) : totalsForMonth(mk);
     const periodMultiplier = viewMode === 'year' ? elapsed : 1;
+    function budgetForPeriod(c){
+      if(viewMode === 'year'){
+        let total = 0;
+        for(let m = 1; m <= elapsed; m++){
+          total += monthlyBudgetFor(c, periodYear + '-' + String(m).padStart(2,'0'));
+        }
+        return total;
+      }
+      return monthlyBudgetFor(c, mk);
+    }
     const periodLabel = viewMode === 'year' ? periodYear : monthLabel(mk);
     const periodWord = viewMode === 'year' ? 'this year' : 'this month';
     const app = document.getElementById('app');
@@ -853,7 +896,7 @@ function boot(state){
           const count = paychecksReceivedFor(incomeLabel);
           return count * (c.monthly / 2);
         }
-        return c.monthly * periodMultiplier;
+        return budgetForPeriod(c);
       }
       return expenseSpent([catLabel(c, state.categories)]);
     };
@@ -868,7 +911,7 @@ function boot(state){
     const expenseGroupsRaw = groupCategories(expenseCats).map(g => {
       const kids = g.children.slice().sort((a,b) => a.name.localeCompare(b.name));
       const labels = [...(g.self ? [catLabel(g.self, state.categories)] : []), ...kids.map(k => catLabel(k, state.categories))];
-      const monthly = ((g.self ? g.self.monthly : 0) + kids.reduce((a,k) => a + k.monthly, 0)) * periodMultiplier;
+      const monthly = (g.self ? budgetForPeriod(g.self) : 0) + kids.reduce((a,k) => a + budgetForPeriod(k), 0);
       const txSpent = expenseSpent(labels);
       const catSpent = (g.self ? categoryActualSpent(g.self) : 0) + kids.reduce((a,k) => a + categoryActualSpent(k), 0);
       const allAutoDeducted = (!g.self || g.self.autoDeducted) && kids.length > 0 && kids.every(k => k.autoDeducted);
@@ -894,7 +937,8 @@ function boot(state){
           '<option value="__new__">+ New group&hellip;</option>' +
         '</select>' +
         '<input type="text" class="cat-edit-parent-new" placeholder="New group name" style="display:none">' +
-        '<input type="number" class="cat-edit-monthly" value="' + c.monthly + '" step="0.01" min="0" placeholder="Monthly budget">' +
+        '<input type="number" class="cat-edit-monthly" value="' + monthlyBudgetFor(c, mk) + '" step="0.01" min="0" placeholder="Monthly budget">' +
+        '<span style="font-size:.7rem; color:var(--ink-soft); font-style:italic; flex:0 0 auto;">effective ' + escapeHtml(monthLabel(mk)) + ' onward</span>' +
         '<button type="button" class="expand-btn" data-cat-save="' + escapeHtml(c.id) + '">Save</button>' +
         '<button type="button" class="expand-btn" data-cat-edit-cancel>Cancel</button>' +
       '</div>';
@@ -939,7 +983,7 @@ function boot(state){
     ];
     const investmentCats = state.categories.filter(c => investmentCatMatchers.some(m => m.name === c.name && c.parent === m.parent));
     const invested = investmentCats.reduce((a,c) => a + categoryActualSpent(c), 0);
-    const investmentBudgeted = investmentCats.reduce((a,c) => a + c.monthly, 0) * periodMultiplier;
+    const investmentBudgeted = investmentCats.reduce((a,c) => a + budgetForPeriod(c), 0);
     const remainingExclInvestments = (budgeted - investmentBudgeted) - (spent - invested);
 
     const allGroupNamesSorted = expenseGroupsRaw.map(g => g.name).slice().sort((a,b) => a.localeCompare(b));
@@ -1009,7 +1053,7 @@ function boot(state){
             const expectedPaychecks = periodMultiplier * 2;
             const count = Math.min(paychecksReceivedFor(incomeLabel), expectedPaychecks);
             const kSpent = categoryActualSpent(k);
-            const kBudget = k.monthly * periodMultiplier;
+            const kBudget = budgetForPeriod(k);
             return '<div class="cat-row cat-child">' +
               '<div class="name">' + escapeHtml(k.name) + ' <span class="pill" style="background:var(--line); color:var(--ink-soft);">auto-deducted</span></div>' +
               '<div class="figures"><span class="num">' + fmtMoney(kSpent) + ' / ' + fmtMoney(kBudget) + '</span><div class="tx-account">' + count + ' of ' + expectedPaychecks + ' paychecks</div></div>' +
@@ -1018,12 +1062,12 @@ function boot(state){
           }
           return '<div class="cat-row cat-child">' +
             '<div class="name">' + escapeHtml(k.name) + ' <span class="pill" style="background:var(--line); color:var(--ink-soft);">auto-deducted</span></div>' +
-            '<div class="figures"><span class="num">' + fmtMoney(k.monthly * periodMultiplier) + ' / paycheck</span></div>' +
+            '<div class="figures"><span class="num">' + fmtMoney(budgetForPeriod(k)) + ' / paycheck</span></div>' +
             catControlsHtml(k) +
           '</div>';
         }
         const kSpent = expenseSpent([catLabel(k, state.categories)]);
-        const kBudget = k.monthly * periodMultiplier;
+        const kBudget = budgetForPeriod(k);
         const kRatio = kBudget > 0 ? kSpent / kBudget : (kSpent > 0 ? Infinity : 0);
         const kStatus = kRatio > 1 ? 'over' : (kRatio >= CAUTION_AT ? 'caution' : 'ok');
         return '<div class="cat-row cat-child">' +
@@ -1058,7 +1102,7 @@ function boot(state){
     const incomeRows = incomeGroups.length ? incomeGroups.map((g, i) => {
       const kids = g.children.slice().sort((a,b) => a.name.localeCompare(b.name));
       const labels = [...(g.self ? [catLabel(g.self, state.categories)] : []), ...kids.map(k => catLabel(k, state.categories))];
-      const monthly = ((g.self ? g.self.monthly : 0) + kids.reduce((a,k) => a + k.monthly, 0)) * periodMultiplier;
+      const monthly = (g.self ? budgetForPeriod(g.self) : 0) + kids.reduce((a,k) => a + budgetForPeriod(k), 0);
       const catActual = incomeActual(labels);
       const incomeColor = sliceColor(i, incomeGroups.length);
       const hasData = g.name !== 'Additional income' && (monthly > 0 || catActual > 0);
@@ -1067,7 +1111,7 @@ function boot(state){
         const kActual = incomeActual([catLabel(k, state.categories)]);
         return '<div class="income-row cat-child">' +
           '<div class="name">' + escapeHtml(k.name) + '</div>' +
-          '<div class="figures"><span class="num good">' + fmtMoney(kActual) + '</span> / <span class="num">' + fmtMoney(k.monthly * periodMultiplier) + ' planned</span></div>' +
+          '<div class="figures"><span class="num good">' + fmtMoney(kActual) + '</span> / <span class="num">' + fmtMoney(budgetForPeriod(k)) + ' planned</span></div>' +
         '</div>';
       }).join('');
       return '<div class="cat-group" data-group="' + escapeHtml(g.name) + '">' +
@@ -1446,7 +1490,7 @@ function boot(state){
       }
       const monthly = parseFloat(document.getElementById('add-cat-monthly').value) || 0;
       const type = document.getElementById('add-cat-type').value;
-      state.categories.push({id: uid(), name, parent, monthly, type});
+      state.categories.push({id: uid(), name, parent, monthly, type, monthlyHistory: [{from: mk, amount: monthly}]});
       addCatOpen = false;
       renderKeepingScroll();
       persist();
@@ -1487,7 +1531,7 @@ function boot(state){
       const oldName = c.name;
       c.name = name;
       c.parent = parent;
-      c.monthly = monthly;
+      upsertMonthlyHistory(c, mk, monthly);
       const newLabel = catLabel(c, state.categories);
       if(oldLabel !== newLabel){
         state.transactions.forEach(t => {
