@@ -486,6 +486,7 @@ function boot(state){
   let splitEditingId = null;
   let splitDraft = null;
   let addCatOpen = false;
+  let addTxOpen = false;
   let headerMenuOpen = false;
   let editingCatId = null;
   let viewMode = 'month';
@@ -1317,6 +1318,20 @@ function boot(state){
             '<div class="table-wrap"><table class="ledger"><thead><tr><th>Date</th><th>Description</th><th style="text-align:right">Amount</th><th>Category</th><th></th></tr></thead><tbody>' +
               (txRows || '<tr><td colspan="5" class="empty">' + (txs.length ? 'No transactions match your search/filter.' : 'No transactions yet &mdash; upload a bank statement.') + '</td></tr>') +
             '</tbody></table></div>' +
+            (addTxOpen ?
+              '<form id="add-tx-form" class="add-cat-form">' +
+                '<input type="date" id="add-tx-date" value="' + new Date().toISOString().slice(0,10) + '" required>' +
+                '<input type="text" id="add-tx-desc" placeholder="Description" required style="flex:2 1 180px;">' +
+                '<input type="number" id="add-tx-amount" placeholder="Amount" step="0.01" min="0" required>' +
+                '<select id="add-tx-type"><option value="expense">Expense</option><option value="income">Income</option></select>' +
+                '<select id="add-tx-category">' + optsHtmlBase.map(name => '<option value="' + escapeHtml(name) + '">' + escapeHtml(name) + '</option>').join('') + '</select>' +
+                '<input type="text" id="add-tx-account" list="add-tx-account-list" placeholder="Account (optional)">' +
+                '<datalist id="add-tx-account-list">' + accountsInUse.map(a => '<option value="' + escapeHtml(a) + '">').join('') + '</datalist>' +
+                '<button type="submit" class="expand-btn">Add</button>' +
+                '<button type="button" class="expand-btn" id="add-tx-cancel">Cancel</button>' +
+              '</form>' :
+              '<div class="add-cat-toggle-wrap"><button type="button" class="expand-btn" id="add-tx-toggle">+ Add transaction</button></div>'
+            ) +
           '</div>' +
         '</div>' +
         '<div>' +
@@ -1492,6 +1507,28 @@ function boot(state){
       const type = document.getElementById('add-cat-type').value;
       state.categories.push({id: uid(), name, parent, monthly, type, monthlyHistory: [{from: mk, amount: monthly}]});
       addCatOpen = false;
+      renderKeepingScroll();
+      persist();
+    });
+    const addTxToggle = document.getElementById('add-tx-toggle');
+    if(addTxToggle) addTxToggle.addEventListener('click', () => { addTxOpen = true; renderKeepingScroll(); });
+    const addTxCancel = document.getElementById('add-tx-cancel');
+    if(addTxCancel) addTxCancel.addEventListener('click', () => { addTxOpen = false; renderKeepingScroll(); });
+    const addTxForm = document.getElementById('add-tx-form');
+    if(addTxForm) addTxForm.addEventListener('submit', (e) => {
+      e.preventDefault();
+      const date = document.getElementById('add-tx-date').value;
+      const desc = document.getElementById('add-tx-desc').value.trim();
+      const amtRaw = parseFloat(document.getElementById('add-tx-amount').value);
+      if(!date || !desc || isNaN(amtRaw)) return;
+      const type = document.getElementById('add-tx-type').value;
+      const category = document.getElementById('add-tx-category').value;
+      const account = document.getElementById('add-tx-account').value.trim() || undefined;
+      const amount = type === 'income' ? Math.abs(amtRaw) : -Math.abs(amtRaw);
+      const key = normalizeMerchant(desc);
+      if(key && category !== 'Uncategorized') state.merchantMap[key] = category;
+      state.transactions.push({id: uid(), date, origDate: date, desc, amount, category, reviewed: true, account});
+      addTxOpen = false;
       renderKeepingScroll();
       persist();
     });
